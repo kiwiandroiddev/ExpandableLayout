@@ -1,18 +1,18 @@
 /***********************************************************************************
  * The MIT License (MIT)
-
+ * <p>
  * Copyright (c) 2014 Robin Chutaux
-
+ * <p>
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
-
+ * <p>
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
-
+ * <p>
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -28,132 +28,170 @@ import android.content.res.TypedArray;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.view.animation.Interpolator;
 import android.view.animation.Transformation;
 import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
 
-public class ExpandableLayout extends RelativeLayout
-{
-    private Boolean isAnimationRunning = false;
-    private Boolean isOpened = false;
+public class ExpandableLayout extends RelativeLayout {
+
+    public static final int DEFAULT_DURATION_INT_RESOURCE_ID = android.R.integer.config_shortAnimTime;
+
+    public interface OnExpansionProgressListener {
+        /**
+         * @param layoutExpansion The value of the layout's expansion progress (0.0 - 1.0)
+         *                        after it has been run through the interpolation function where
+         *                        0.0 = fully collapsed and 1.0 = fully expanded.
+         */
+        void onExpansionProgress(float layoutExpansion);
+    }
+
+    private boolean isAnimationRunning = false;
+    private boolean isOpened = false;
     private Integer duration;
     private FrameLayout contentLayout;
     private FrameLayout headerLayout;
     private Animation animation;
+    private Interpolator interpolator;
 
-    public ExpandableLayout(Context context)
-    {
+    private OnExpansionProgressListener expansionProgressListener;
+
+    public ExpandableLayout(Context context) {
         super(context);
     }
 
-    public ExpandableLayout(Context context, AttributeSet attrs)
-    {
+    public ExpandableLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
         init(context, attrs);
     }
 
-    public ExpandableLayout(Context context, AttributeSet attrs, int defStyle)
-    {
+    public ExpandableLayout(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
         init(context, attrs);
     }
 
-    private void init(final Context context, AttributeSet attrs)
-    {
-        final View rootView = View.inflate(context, R.layout.view_expandable, this);
-        headerLayout = (FrameLayout) rootView.findViewById(R.id.view_expandable_headerlayout);
-        final TypedArray typedArray = context.obtainStyledAttributes(attrs, R.styleable.ExpandableLayout);
-        final int headerID = typedArray.getResourceId(R.styleable.ExpandableLayout_el_headerLayout, -1);
-        final int contentID = typedArray.getResourceId(R.styleable.ExpandableLayout_el_contentLayout, -1);
-        contentLayout = (FrameLayout) rootView.findViewById(R.id.view_expandable_contentLayout);
-
-        if (headerID == -1 || contentID == -1)
-            throw new IllegalArgumentException("HeaderLayout and ContentLayout cannot be null!");
-
+    private void init(final Context context, AttributeSet attrs) {
         if (isInEditMode())
             return;
 
-        duration = typedArray.getInt(R.styleable.ExpandableLayout_el_duration, getContext().getResources().getInteger(android.R.integer.config_shortAnimTime));
-        final View headerView = View.inflate(context, headerID, null);
-        headerView.setLayoutParams(new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        headerLayout.addView(headerView);
-        final View contentView = View.inflate(context, contentID, null);
-        contentView.setLayoutParams(new ViewGroup.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        contentLayout.addView(contentView);
-        contentLayout.setVisibility(GONE);
-        headerLayout.setOnClickListener(new OnClickListener()
-        {
-            @Override
-            public void onClick(View v)
-            {
-                if (!isAnimationRunning)
-                {
-                    if (contentLayout.getVisibility() == VISIBLE)
-                        collapse(contentLayout);
-                    else
-                        expand(contentLayout);
+        final View rootView = View.inflate(context, R.layout.view_expandable, this);
+        final TypedArray typedArray = context.obtainStyledAttributes(attrs, R.styleable.ExpandableLayout);
 
-                    isAnimationRunning = true;
-                    new Handler().postDelayed(new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                            isAnimationRunning = false;
-                        }
-                    }, duration);
-                }
-            }
-        });
+        initDuration(typedArray);
+        initInterpolator(typedArray);
+        initHeaderLayout(rootView, typedArray);
+        initContentLayout(rootView, typedArray);
 
         typedArray.recycle();
     }
 
-    private void expand(final View v)
-    {
-        v.measure(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        final int targetHeight = v.getMeasuredHeight();
-        v.getLayoutParams().height = 0;
-        v.setVisibility(VISIBLE);
+    private void initContentLayout(View rootView, TypedArray typedArray) {
+        final int contentID = typedArray.getResourceId(R.styleable.ExpandableLayout_el_contentLayout, -1);
+        if (contentID == -1) {
+            throw new IllegalArgumentException("ContentLayout cannot be null!");
+        }
 
-        animation = new Animation()
-        {
-            @Override
-            protected void applyTransformation(float interpolatedTime, Transformation t)
-            {
-                if (interpolatedTime == 1)
-                    isOpened = true;
-                v.getLayoutParams().height = (interpolatedTime == 1) ? LayoutParams.WRAP_CONTENT : (int) (targetHeight * interpolatedTime);
-                v.requestLayout();
-            }
-
-
-            @Override
-            public boolean willChangeBounds() {
-                return true;
-            }
-        };
-        animation.setDuration(duration);
-        v.startAnimation(animation);
+        final View contentView = View.inflate(getContext(), contentID, null);
+        contentLayout = (FrameLayout) rootView.findViewById(R.id.view_expandable_contentLayout);
+        contentLayout.addView(contentView);
+        contentLayout.setVisibility(GONE);
     }
 
-    private void collapse(final View v)
-    {
-        final int initialHeight = v.getMeasuredHeight();
-        animation = new Animation()
-        {
+    private void initHeaderLayout(View rootView, TypedArray typedArray) {
+        final int headerID = typedArray.getResourceId(R.styleable.ExpandableLayout_el_headerLayout, -1);
+        if (headerID == -1) {
+            throw new IllegalArgumentException("HeaderLayout cannot be null!");
+        }
+
+        final View headerView = View.inflate(getContext(), headerID, null);
+        headerLayout = (FrameLayout) rootView.findViewById(R.id.view_expandable_headerlayout);
+        headerLayout.addView(headerView);
+        headerLayout.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (contentLayout.getVisibility() == VISIBLE) {
+                    collapse(contentLayout);
+                } else {
+                    expand(contentLayout);
+                }
+            }
+        });
+    }
+
+    private void initDuration(TypedArray typedArray) {
+        duration = typedArray.getInt(R.styleable.ExpandableLayout_el_duration,
+                getContext().getResources().getInteger(DEFAULT_DURATION_INT_RESOURCE_ID));
+    }
+
+    private void initInterpolator(TypedArray typedArray) {
+        final int interpolatorID = typedArray.getResourceId(R.styleable.ExpandableLayout_el_interpolator, -1);
+        if (interpolatorID != -1) {
+            interpolator = AnimationUtils.loadInterpolator(getContext(), interpolatorID);
+        }
+    }
+
+    private void expand(final View layout) {
+        if (isAnimationRunning)
+            return;
+
+        layout.measure(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        final int targetHeight = layout.getMeasuredHeight();
+        layout.getLayoutParams().height = 0;
+        layout.setVisibility(VISIBLE);
+
+        animation = new Animation() {
             @Override
             protected void applyTransformation(float interpolatedTime, Transformation t) {
-                if(interpolatedTime == 1)
-                {
-                    v.setVisibility(View.GONE);
-                    isOpened = false;
+                if (expansionProgressListener != null) {
+                    expansionProgressListener.onExpansionProgress(interpolatedTime);
                 }
-                else{
-                    v.getLayoutParams().height = initialHeight - (int)(initialHeight * interpolatedTime);
-                    v.requestLayout();
+
+                if (interpolatedTime == 1)
+                    isOpened = true;
+                layout.getLayoutParams().height = (interpolatedTime == 1) ?
+                        LayoutParams.WRAP_CONTENT :
+                        (int) (targetHeight * interpolatedTime);
+                layout.requestLayout();
+            }
+
+            @Override
+            public boolean willChangeBounds() {
+                return true;
+            }
+        };
+        animation.setInterpolator(interpolator);
+        animation.setDuration(duration);
+        layout.startAnimation(animation);
+
+        isAnimationRunning = true;
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                isAnimationRunning = false;
+            }
+        }, duration);
+    }
+
+    private void collapse(final View layout) {
+        if (isAnimationRunning)
+            return;
+
+        final int initialHeight = layout.getMeasuredHeight();
+        animation = new Animation() {
+            @Override
+            protected void applyTransformation(float interpolatedTime, Transformation t) {
+                if (expansionProgressListener != null) {
+                    expansionProgressListener.onExpansionProgress(1.0f - interpolatedTime);
+                }
+
+                if (interpolatedTime == 1) {
+                    layout.setVisibility(View.GONE);
+                    isOpened = false;
+                } else {
+                    layout.getLayoutParams().height = initialHeight - (int) (initialHeight * interpolatedTime);
+                    layout.requestLayout();
                 }
             }
 
@@ -162,58 +200,61 @@ public class ExpandableLayout extends RelativeLayout
                 return true;
             }
         };
-
+        animation.setInterpolator(interpolator);
         animation.setDuration(duration);
-        v.startAnimation(animation);
+        layout.startAnimation(animation);
+
+        isAnimationRunning = true;
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                isAnimationRunning = false;
+            }
+        }, duration);
     }
 
-    public Boolean isOpened()
-    {
+    public Boolean isOpened() {
         return isOpened;
     }
 
-    public void show()
-    {
-        if (!isAnimationRunning)
-        {
-            expand(contentLayout);
-            isAnimationRunning = true;
-            new Handler().postDelayed(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    isAnimationRunning = false;
-                }
-            }, duration);
-        }
+    public void setInterpolator(Interpolator interpolator) {
+        this.interpolator = interpolator;
     }
 
-    public FrameLayout getHeaderLayout()
-    {
+    public Interpolator getInterpolator() {
+        return interpolator;
+    }
+
+    public void setDuration(Integer duration) {
+        this.duration = duration;
+    }
+
+    public Integer getDuration() {
+        return duration;
+    }
+
+    public FrameLayout getHeaderLayout() {
         return headerLayout;
     }
 
-    public FrameLayout getContentLayout()
-    {
+    public FrameLayout getContentLayout() {
         return contentLayout;
     }
 
-    public void hide()
-    {
-        if (!isAnimationRunning)
-        {
-            collapse(contentLayout);
-            isAnimationRunning = true;
-            new Handler().postDelayed(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    isAnimationRunning = false;
-                }
-            }, duration);
-        }
+    public void setExpansionProgressListener(OnExpansionProgressListener expansionProgressListener) {
+        this.expansionProgressListener = expansionProgressListener;
+    }
+
+    public OnExpansionProgressListener getExpansionProgressListener() {
+        return expansionProgressListener;
+    }
+
+    public void show() {
+        expand(contentLayout);
+    }
+
+    public void hide() {
+        collapse(contentLayout);
     }
 
     @Override

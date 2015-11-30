@@ -2,14 +2,18 @@ package com.andexert.expandablelayout;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 
+import com.andexert.expandablelayout.library.ExpandableLayout;
 import com.andexert.expandablelayout.library.ExpandableLayoutListView;
 
 
 public class MainActivity extends Activity {
+
+    private static final String TAG = "MainActivity";
 
     private final String[] array = {"Hello", "World", "Android", "is", "Awesome", "World", "Android", "is", "Awesome", "World", "Android", "is", "Awesome", "World", "Android", "is", "Awesome"};
 
@@ -17,6 +21,15 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        ExpandableLayout expandableLayout = (ExpandableLayout) findViewById(R.id.first);
+        expandableLayout.setExpansionProgressListener(new ExpandableLayout.OnExpansionProgressListener() {
+            @Override
+            public void onExpansionProgress(float interpolatedTime) {
+                Log.d(TAG, "onExpansionProgress() called with: " + "interpolatedTime = [" + interpolatedTime + "]");
+            }
+        });
+//        expandableLayout.setInterpolator(new AccelerateInterpolator());
 
         final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<String>(this, R.layout.view_row, R.id.header_text, array);
         final ExpandableLayoutListView expandableLayoutListView = (ExpandableLayoutListView) findViewById(R.id.listview);

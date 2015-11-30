@@ -161,7 +161,10 @@ public class ExpandableLayout extends RelativeLayout {
                 return true;
             }
         };
-        animation.setInterpolator(interpolator);
+
+        if (interpolator != null) {
+            animation.setInterpolator(interpolator);
+        }
         animation.setDuration(duration);
         layout.startAnimation(animation);
 
@@ -200,7 +203,9 @@ public class ExpandableLayout extends RelativeLayout {
                 return true;
             }
         };
-        animation.setInterpolator(interpolator);
+        if (interpolator != null) {
+            animation.setInterpolator(interpolator);
+        }
         animation.setDuration(duration);
         layout.startAnimation(animation);
 

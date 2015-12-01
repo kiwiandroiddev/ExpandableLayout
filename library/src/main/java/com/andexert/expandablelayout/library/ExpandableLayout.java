@@ -25,7 +25,9 @@ package com.andexert.expandablelayout.library;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.os.Bundle;
 import android.os.Handler;
+import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.animation.Animation;
@@ -38,6 +40,8 @@ import android.widget.RelativeLayout;
 public class ExpandableLayout extends RelativeLayout {
 
     public static final int DEFAULT_DURATION_INT_RESOURCE_ID = android.R.integer.config_shortAnimTime;
+    public static final String KEY_INSTANCE_STATE = "instanceState";
+    public static final String KEY_IS_OPENED = "isOpened";
 
     public interface OnExpansionProgressListener {
         /**
@@ -112,9 +116,9 @@ public class ExpandableLayout extends RelativeLayout {
             @Override
             public void onClick(View v) {
                 if (contentLayout.getVisibility() == VISIBLE) {
-                    collapse(contentLayout);
+                    collapse();
                 } else {
-                    expand(contentLayout);
+                    expand();
                 }
             }
         });
@@ -132,14 +136,14 @@ public class ExpandableLayout extends RelativeLayout {
         }
     }
 
-    private void expand(final View layout) {
+    private void expand() {
         if (isAnimationRunning)
             return;
 
-        layout.measure(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        final int targetHeight = layout.getMeasuredHeight();
-        layout.getLayoutParams().height = 0;
-        layout.setVisibility(VISIBLE);
+        contentLayout.measure(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        final int targetHeight = contentLayout.getMeasuredHeight();
+        contentLayout.getLayoutParams().height = 0;
+        contentLayout.setVisibility(VISIBLE);
 
         animation = new Animation() {
             @Override
@@ -150,10 +154,10 @@ public class ExpandableLayout extends RelativeLayout {
 
                 if (interpolatedTime == 1)
                     isOpened = true;
-                layout.getLayoutParams().height = (interpolatedTime == 1) ?
+                contentLayout.getLayoutParams().height = (interpolatedTime == 1) ?
                         LayoutParams.WRAP_CONTENT :
                         (int) (targetHeight * interpolatedTime);
-                layout.requestLayout();
+                contentLayout.requestLayout();
             }
 
             @Override
@@ -166,7 +170,7 @@ public class ExpandableLayout extends RelativeLayout {
             animation.setInterpolator(interpolator);
         }
         animation.setDuration(duration);
-        layout.startAnimation(animation);
+        contentLayout.startAnimation(animation);
 
         isAnimationRunning = true;
         new Handler().postDelayed(new Runnable() {
@@ -177,11 +181,11 @@ public class ExpandableLayout extends RelativeLayout {
         }, duration);
     }
 
-    private void collapse(final View layout) {
+    private void collapse() {
         if (isAnimationRunning)
             return;
 
-        final int initialHeight = layout.getMeasuredHeight();
+        final int initialHeight = contentLayout.getMeasuredHeight();
         animation = new Animation() {
             @Override
             protected void applyTransformation(float interpolatedTime, Transformation t) {
@@ -190,11 +194,11 @@ public class ExpandableLayout extends RelativeLayout {
                 }
 
                 if (interpolatedTime == 1) {
-                    layout.setVisibility(View.GONE);
+                    contentLayout.setVisibility(View.GONE);
                     isOpened = false;
                 } else {
-                    layout.getLayoutParams().height = initialHeight - (int) (initialHeight * interpolatedTime);
-                    layout.requestLayout();
+                    contentLayout.getLayoutParams().height = initialHeight - (int) (initialHeight * interpolatedTime);
+                    contentLayout.requestLayout();
                 }
             }
 
@@ -207,7 +211,7 @@ public class ExpandableLayout extends RelativeLayout {
             animation.setInterpolator(interpolator);
         }
         animation.setDuration(duration);
-        layout.startAnimation(animation);
+        contentLayout.startAnimation(animation);
 
         isAnimationRunning = true;
         new Handler().postDelayed(new Runnable() {
@@ -216,6 +220,35 @@ public class ExpandableLayout extends RelativeLayout {
                 isAnimationRunning = false;
             }
         }, duration);
+    }
+
+    @Override
+    protected Parcelable onSaveInstanceState() {
+        Bundle bundle = new Bundle();
+        bundle.putParcelable(KEY_INSTANCE_STATE, super.onSaveInstanceState());
+        bundle.putBoolean(KEY_IS_OPENED, isOpened);
+        return bundle;
+    }
+
+    @Override
+    public void onRestoreInstanceState(Parcelable state) {
+        if (state instanceof Bundle) {
+            Bundle bundle = (Bundle) state;
+            initOpenState(bundle.getBoolean(KEY_IS_OPENED, this.isOpened));
+            state = bundle.getParcelable(KEY_INSTANCE_STATE);
+        }
+        super.onRestoreInstanceState(state);
+    }
+
+    private void initOpenState(boolean opened) {
+        if (isAnimationRunning) {
+            return;
+        }
+
+        if (opened != isOpened) {
+            isOpened = opened;
+            contentLayout.setVisibility(isOpened ? VISIBLE : GONE);
+        }
     }
 
     public Boolean isOpened() {
@@ -255,11 +288,11 @@ public class ExpandableLayout extends RelativeLayout {
     }
 
     public void show() {
-        expand(contentLayout);
+        expand();
     }
 
     public void hide() {
-        collapse(contentLayout);
+        collapse();
     }
 
     @Override
@@ -267,3 +300,4 @@ public class ExpandableLayout extends RelativeLayout {
         animation.setAnimationListener(animationListener);
     }
 }
+

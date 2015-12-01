@@ -5,6 +5,16 @@ ExpandableLayout
 
 ExpandableLayout provides an easy way to create a view called header with an expandable view. Both view are external layout to allow a maximum of customization. [You can find a sample](https://github.com/traex/ExpandableLayout/blob/master/sample/) that how to use an ExpandableLayout to your layout.
 
+#### Fork!
+
+This is a fork of traex's original ExpandableLayout with some additional features:
+
+* Interpolator support (via XMl attribute or setter)
+* Duration can be set programmatically
+* A listener can be attached to animate other views in sync
+* Header and content layout params are no longer overridden with `WRAP_CONTENT`
+* View state (open/closed) now persists across configuration changes
+
 ![ExpandableLayout GIF](https://github.com/traex/ExpandableLayout/blob/master/demo.gif)
  
 ### Integration

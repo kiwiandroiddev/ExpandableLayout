@@ -9,7 +9,7 @@ ExpandableLayout provides an easy way to create a view called header with an exp
 
 This is a fork of traex's original ExpandableLayout with some additional features:
 
-* Interpolator support (via XMl attribute or setter)
+* Interpolator support (via XML attribute or setter)
 * Duration can be set programmatically
 * A listener can be attached to animate other views in sync
 * Header and content layout params are no longer overridden with `WRAP_CONTENT`
